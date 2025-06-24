@@ -2,153 +2,148 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Terrain</title>
   <style>
-    html, body { margin: 0; overflow: hidden; height: 100%; background: #000; }
+    body { margin: 0; overflow: hidden; }
     canvas { display: block; }
-    #fpsCounter {
-      position: absolute; top: 5px; left: 5px;
-      color: lime; background: #222; font: 12px monospace; padding: 2px 6px;
+    #joystick, #jumpBtn, #sprintBtn {
+      position: absolute;
+      z-index: 10;
     }
-    #buttons {
-      position: absolute; bottom: 20px; right: 10px;
-      display: flex; flex-direction: column; gap: 8px;
+    #joystick {
+      bottom: 20px; left: 20px;
     }
-    .btn {
-      background: green; color: white; border: none;
-      padding: 5px 10px; border-radius: 5px; font-size: 14px;
+    #jumpBtn, #sprintBtn {
+      right: 20px;
+      background: green; color: white;
+      border: none; padding: 8px 12px; margin: 4px;
+      border-radius: 6px;
     }
-    #joystickZone {
-      position: absolute; bottom: 20px; left: 20px;
-      width: 100px; height: 100px;
+    #fps {
+      position: absolute;
+      top: 6px; left: 6px;
+      background: #444; color: #0f0;
+      font-family: monospace;
+      padding: 2px 6px; border-radius: 3px;
+      font-size: 12px;
     }
   </style>
 </head>
 <body>
-  <div id="fpsCounter">FPS: 0</div>
-  <div id="buttons">
-    <button class="btn" id="jumpBtn">Jump</button>
-    <button class="btn" id="sprintBtn">Sprint</button>
-  </div>
-  <div id="joystickZone"></div>
+  <div id="fps">FPS: 0</div>
+  <div id="joystick"></div>
+  <button id="jumpBtn">Jump</button>
+  <button id="sprintBtn">Sprint</button>
 
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/simplex-noise@3.0.1/simplex-noise.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/nipplejs@0.9.0/dist/nipplejs.min.js"></script>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.152.2/examples/jsm/controls/OrbitControls.js';
+    import { SimplexNoise } from 'https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/+esm';
 
-  <script>
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(100, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer();
+    let scene = new THREE.Scene();
+    let camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.1, 1000);
+    let renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
     // Skybox
     const loader = new THREE.CubeTextureLoader();
-    scene.background = loader.load(['px.jpg', 'nx.jpg', 'py.jpg', 'ny.jpg', 'pz.jpg', 'nz.jpg']);
+    scene.background = loader.load(['nx.jpg','px.jpg','ny.jpg','py.jpg','nz.jpg','pz.jpg']);
 
-    // Textures
-    const texLoader = new THREE.TextureLoader();
-    const textures = {
-      grass: texLoader.load('grass_top.png'),
-      dirt: texLoader.load('dirt.png'),
-      sand: texLoader.load('sand.png'),
-      stone: texLoader.load('stone.png'),
-      iron: texLoader.load('iron_ore.png'),
-    };
+    // Lights
+    const ambient = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(ambient);
 
     // Terrain generation
     const simplex = new SimplexNoise();
-    const size = 32;
-    const scale = 0.1;
+    const blockSize = 1;
+    const terrainSize = 50;
+    const textures = {
+      grass: new THREE.TextureLoader().load('grass_top.png'),
+      dirt: new THREE.TextureLoader().load('dirt.png'),
+      sand: new THREE.TextureLoader().load('sand.png'),
+      stone: new THREE.TextureLoader().load('stone.png'),
+      iron: new THREE.TextureLoader().load('iron_ore.png')
+    };
+    for (let x = -terrainSize; x < terrainSize; x++) {
+      for (let z = -terrainSize; z < terrainSize; z++) {
+        const y = Math.floor(simplex.noise2D(x / 10, z / 10) * 5);
+        const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
 
-    for (let x = -size; x < size; x++) {
-      for (let z = -size; z < size; z++) {
-        const y = Math.floor(simplex.noise2D(x * scale, z * scale) * 4);
-        const geometry = new THREE.BoxGeometry(1, 1, 1);
-        const keys = Object.keys(textures);
-        const texKey = keys[Math.floor(Math.random() * keys.length)];
-        const material = new THREE.MeshLambertMaterial({ map: textures[texKey] });
+        let tex = textures.grass;
+        if (y < -2) tex = textures.sand;
+        else if (y > 3) tex = textures.stone;
+        else if (Math.random() < 0.05) tex = textures.iron;
+
+        const material = new THREE.MeshBasicMaterial({ map: tex });
         const cube = new THREE.Mesh(geometry, material);
         cube.position.set(x, y, z);
         scene.add(cube);
       }
     }
 
-    // Lighting
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 10, 7);
-    scene.add(light);
+    // Controls
+    camera.position.set(0, 10, 20);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enablePan = false;
 
-    // Player setup
-    let velocityY = 0;
-    let onGround = true;
-    const playerSpeed = 0.1;
-    const sprintBoost = 0.2;
-    let sprinting = false;
+    // Movement
+    const velocity = new THREE.Vector3();
+    let isJumping = false, isSprinting = false;
 
-    camera.position.set(0, 10, 10);
-    camera.lookAt(0, 0, 0);
+    document.getElementById('jumpBtn').onclick = () => {
+      if (!isJumping) {
+        velocity.y = 0.3;
+        isJumping = true;
+      }
+    };
+    document.getElementById('sprintBtn').onmousedown = () => isSprinting = true;
+    document.getElementById('sprintBtn').onmouseup = () => isSprinting = false;
 
     const keys = {};
-    document.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
-    document.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-    // Joystick
-    const joystick = nipplejs.create({
-      zone: document.getElementById('joystickZone'),
-      mode: 'static',
-      position: { left: '50%', top: '50%' },
-      color: 'blue'
-    });
-
-    let joystickVector = { x: 0, y: 0 };
-    joystick.on('move', (e, data) => {
-      joystickVector = data.vector;
-    });
-    joystick.on('end', () => {
-      joystickVector = { x: 0, y: 0 };
-    });
-
-    // Sprint and Jump
-    document.getElementById('sprintBtn').onclick = () => sprinting = !sprinting;
-    document.getElementById('jumpBtn').onclick = () => {
-      if (onGround) velocityY = 0.15;
-      onGround = false;
-    };
+    window.onkeydown = e => keys[e.key.toLowerCase()] = true;
+    window.onkeyup = e => keys[e.key.toLowerCase()] = false;
 
     // FPS Counter
-    let lastFrameTime = performance.now();
-    const fpsCounter = document.getElementById('fpsCounter');
+    let fpsCounter = document.getElementById('fps');
+    let lastTime = performance.now(), frames = 0;
 
+    // Animate
     function animate() {
       requestAnimationFrame(animate);
-      const now = performance.now();
-      const delta = now - lastFrameTime;
-      const fps = Math.round(1000 / delta);
-      fpsCounter.innerText = `FPS: ${fps}`;
-      lastFrameTime = now;
+      let speed = isSprinting ? 0.2 : 0.1;
 
-      // Gravity
-      velocityY -= 0.01;
-      camera.position.y += velocityY;
-      if (camera.position.y < 5) {
-        camera.position.y = 5;
-        velocityY = 0;
-        onGround = true;
+      if (keys['w']) velocity.z = -speed;
+      if (keys['s']) velocity.z = speed;
+      if (keys['a']) velocity.x = -speed;
+      if (keys['d']) velocity.x = speed;
+
+      camera.position.x += velocity.x;
+      camera.position.y += velocity.y;
+      camera.position.z += velocity.z;
+
+      velocity.x *= 0.9;
+      velocity.z *= 0.9;
+      velocity.y -= 0.01;
+
+      if (camera.position.y <= 3) {
+        camera.position.y = 3;
+        velocity.y = 0;
+        isJumping = false;
       }
 
-      // Movement
-      let speed = sprinting ? playerSpeed + sprintBoost : playerSpeed;
-      let dirX = joystickVector.x || (keys['d'] ? 1 : keys['a'] ? -1 : 0);
-      let dirZ = joystickVector.y || (keys['s'] ? 1 : keys['w'] ? -1 : 0);
-      camera.position.x += dirX * speed;
-      camera.position.z += dirZ * speed;
-
+      controls.update();
       renderer.render(scene, camera);
-    }
 
+      // FPS
+      frames++;
+      let now = performance.now();
+      if (now - lastTime > 1000) {
+        fpsCounter.textContent = 'FPS: ' + frames;
+        frames = 0;
+        lastTime = now;
+      }
+    }
     animate();
   </script>
 </body>
