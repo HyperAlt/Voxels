@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Voxel Terrain with Joystick</title>
+  <title>Voxel World</title>
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
     canvas { display: block; }
@@ -35,7 +35,7 @@
     import { OrbitControls } from 'https://unpkg.com/three@0.152.2/examples/jsm/controls/OrbitControls.js';
     import SimplexNoise from 'https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/+esm';
 
-    // Load joystick (nipplejs)
+    // Load nipplejs joystick
     const nippleScript = document.createElement('script');
     nippleScript.src = 'https://cdn.jsdelivr.net/npm/nipplejs@0.9.0/dist/nipplejs.min.js';
     document.body.appendChild(nippleScript);
@@ -57,7 +57,7 @@
 
       scene.add(new THREE.AmbientLight(0xffffff));
 
-      // Textures
+      // Load textures
       const texLoader = new THREE.TextureLoader();
       const textures = {
         grass: texLoader.load('grass_top.png'),
@@ -67,7 +67,7 @@
         iron: texLoader.load('iron_ore.png')
       };
 
-      // Terrain generation
+      // Terrain
       const simplex = new SimplexNoise();
       const size = 32;
       for (let x = -size; x < size; x++) {
@@ -91,11 +91,10 @@
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.enablePan = false;
 
-      // Movement setup
+      // Movement
       const velocity = new THREE.Vector3();
       const joystickVector = { x: 0, y: 0 };
       const keys = {};
-
       window.onkeydown = e => keys[e.key.toLowerCase()] = true;
       window.onkeyup = e => keys[e.key.toLowerCase()] = false;
 
@@ -103,7 +102,7 @@
         zone: document.getElementById('joystickZone'),
         mode: 'static',
         position: { left: '50px', bottom: '50px' },
-        color: 'green'
+        color: 'lime'
       });
 
       manager.on('move', (evt, data) => {
@@ -112,7 +111,6 @@
           joystickVector.y = data.vector.y;
         }
       });
-
       manager.on('end', () => {
         joystickVector.x = 0;
         joystickVector.y = 0;
@@ -125,7 +123,6 @@
       function animate() {
         requestAnimationFrame(animate);
 
-        // Movement
         const speed = 0.1;
         velocity.x = (keys['a'] ? -1 : keys['d'] ? 1 : joystickVector.x || 0) * speed;
         velocity.z = (keys['w'] ? -1 : keys['s'] ? 1 : joystickVector.y || 0) * speed;
@@ -139,7 +136,7 @@
         frames++;
         const now = performance.now();
         if (now - last > 1000) {
-          fpsEl.innerText = `FPS: ${frames}`;
+          fpsEl.textContent = 'FPS: ' + frames;
           frames = 0;
           last = now;
         }
