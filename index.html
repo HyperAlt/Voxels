@@ -1,165 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Voxel World</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-    #fps { position: fixed; top: 4px; left: 4px; background: rgba(0,0,0,0.6); color: lime; font-family: monospace; font-size: 14px; padding: 2px 6px; border-radius: 4px; z-index: 9; }
-    #ui { position: fixed; bottom: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 9; }
-    #ui button { background: green; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 14px; }
-    #joystick { position: fixed; bottom: 20px; left: 20px; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 2px solid white; touch-action: none; }
-    #stick { width: 40px; height: 40px; background: white; border-radius: 50%; position: absolute; top: 20px; left: 20px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bloxd.io Clone</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.165.0/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.165.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-  <div id="fps">FPS: 0</div>
-  <div id="ui">
-    <button id="jump">Jump</button>
-    <button id="sprint">Sprint</button>
-  </div>
-  <div id="joystick"><div id="stick"></div></div>
+    <script>
+        // main.js content starts here (embedded)
 
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
-    import { PointerLockControls } from 'https://unpkg.com/three@0.152.2/examples/jsm/controls/PointerLockControls.js';
-    import SimplexNoise from 'https://cdn.skypack.dev/simplex-noise';
+        let scene, camera, renderer, controls;
+        const world = {}; // To store our block data
+        const blockSize = 1; // Size of each block
 
-    const simplex = new SimplexNoise();
+        // Texture loader
+        const textureLoader = new THREE.TextureLoader();
+        const textures = {
+            grass_top: textureLoader.load('textures/grass_top.png'),
+            dirt: textureLoader.load('textures/dirt.png'),
+            stone: textureLoader.load('textures/stone.png'),
+            sand: textureLoader.load('textures/sand.png'),
+            iron_ore: textureLoader.load('textures/iron_ore.png'),
+        };
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(100, innerWidth/innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(innerWidth, innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const controls = new PointerLockControls(camera, renderer.domElement);
-    scene.add(controls.getObject());
-
-    const textures = {};
-    const loader = new THREE.TextureLoader();
-    const textureList = ['grass_top', 'stone', 'dirt', 'sand', 'iron_ore'];
-    for (let name of textureList) {
-      textures[name] = loader.load(`${name}.png`);
-    }
-
-    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-    const materials = {
-      grass: new THREE.MeshBasicMaterial({ map: textures.grass_top }),
-      stone: new THREE.MeshBasicMaterial({ map: textures.stone }),
-      dirt: new THREE.MeshBasicMaterial({ map: textures.dirt }),
-      sand: new THREE.MeshBasicMaterial({ map: textures.sand }),
-      iron: new THREE.MeshBasicMaterial({ map: textures.iron_ore }),
-    };
-
-    function getMat(y) {
-      if (y < 1) return materials.stone;
-      if (y < 2) return materials.dirt;
-      if (y < 3) return materials.sand;
-      if (Math.random() > 0.995) return materials.iron;
-      return materials.grass;
-    }
-
-    // Generate terrain
-    for (let x = -16; x <= 16; x++) {
-      for (let z = -16; z <= 16; z++) {
-        const height = Math.floor(simplex.noise2D(x / 10, z / 10) * 4 + 4);
-        for (let y = 0; y < height; y++) {
-          const cube = new THREE.Mesh(boxGeo, getMat(y));
-          cube.position.set(x, y, z);
-          scene.add(cube);
+        // Function to create a material for a block type
+        function createBlockMaterial(textureName) {
+            // For this basic setup, we use the same texture for all faces.
+            // For grass, you'd typically have different textures for top, side, and bottom.
+            // A more advanced approach would use a texture atlas and UV mapping.
+            return new THREE.MeshLambertMaterial({ map: textures[textureName] }); // Using LambertMaterial for basic lighting
         }
-      }
-    }
 
-    camera.position.set(0, 10, 0);
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
 
-    // Movement
-    let velocity = new THREE.Vector3();
-    const keys = {};
-    document.addEventListener('keydown', e => keys[e.code] = true);
-    document.addEventListener('keyup', e => keys[e.code] = false);
+            // Skybox setup
+            const skyboxLoader = new THREE.CubeTextureLoader();
+            const skyboxTextures = [
+                'textures/px.png', 'textures/nx.png', // Right, Left
+                'textures/py.png', 'textures/ny.png', // Top, Bottom
+                'textures/pz.png', 'textures/nz.png'  // Front, Back
+            ];
+            const skybox = skyboxLoader.load(skyboxTextures);
+            scene.background = skybox;
 
-    let canJump = false;
-    const direction = new THREE.Vector3();
-    const speed = 0.1;
-    const sprintSpeed = 0.2;
+            // Camera setup
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 50, 100); // Initial camera position
 
-    // Jump and Sprint
-    document.getElementById('jump').onclick = () => {
-      if (canJump) {
-        velocity.y += 0.2;
-        canJump = false;
-      }
-    };
-    document.getElementById('sprint').onmousedown = () => keys['ShiftLeft'] = true;
-    document.getElementById('sprint').onmouseup = () => keys['ShiftLeft'] = false;
+            // Renderer setup
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
 
-    // Joystick movement
-    const stick = document.getElementById('stick');
-    let joyX = 0, joyY = 0;
-    let dragging = false;
-    stick.addEventListener('pointerdown', e => dragging = true);
-    window.addEventListener('pointerup', e => { dragging = false; stick.style.left = '20px'; stick.style.top = '20px'; joyX = joyY = 0; });
-    window.addEventListener('pointermove', e => {
-      if (dragging) {
-        const rect = document.getElementById('joystick').getBoundingClientRect();
-        joyX = (e.clientX - rect.left - 40) / 40;
-        joyY = (e.clientY - rect.top - 40) / 40;
-        joyX = Math.max(-1, Math.min(1, joyX));
-        joyY = Math.max(-1, Math.min(1, joyY));
-        stick.style.left = `${joyX * 20 + 20}px`;
-        stick.style.top = `${joyY * 20 + 20}px`;
-      }
-    });
+            // OrbitControls for camera movement
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true; // For smoother movement
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 1;
+            controls.maxDistance = 500;
+            controls.maxPolarAngle = Math.PI / 2; // Prevent camera from going below ground
 
-    // Pointer lock to enable camera look
-    document.body.onclick = () => controls.lock();
+            // Basic lighting (essential for MeshLambertMaterial)
+            const ambientLight = new THREE.AmbientLight(0x404040); // Soft white light
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+            directionalLight.position.set(50, 100, 50);
+            scene.add(directionalLight);
 
-    // FPS counter
-    const fpsEl = document.getElementById('fps');
-    let lastTime = performance.now(), frames = 0;
+            // Handle window resizing
+            window.addEventListener('resize', onWindowResize, false);
 
-    function animate() {
-      requestAnimationFrame(animate);
+            // Generate the terrain
+            generateTerrain(100, 100, 15); // Generate a 100x100 terrain with a height scale of 15
 
-      // FPS
-      frames++;
-      const now = performance.now();
-      if (now - lastTime >= 1000) {
-        fpsEl.innerText = 'FPS: ' + frames;
-        frames = 0;
-        lastTime = now;
-      }
+            // Start the game loop
+            animate();
+        }
 
-      // Movement
-      direction.z = joyY;
-      direction.x = joyX;
+        // Function to handle window resizing
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
 
-      if (keys['KeyW']) direction.z = -1;
-      if (keys['KeyS']) direction.z = 1;
-      if (keys['KeyA']) direction.x = -1;
-      if (keys['KeyD']) direction.x = 1;
+        // Function to add a single block to the scene
+        function addBlock(x, y, z, type) {
+            const material = createBlockMaterial(type);
+            const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+            const cube = new THREE.Mesh(geometry, material);
+            cube.position.set(x * blockSize, y * blockSize, z * blockSize);
+            scene.add(cube);
+            world[`${x},${y},${z}`] = type; // Store block type in our world data structure
+        }
 
-      direction.normalize();
-      const currentSpeed = keys['ShiftLeft'] ? sprintSpeed : speed;
+        // Simple Perlin-like noise function for height (for demonstration, not a true Perlin implementation)
+        function getNoiseHeight(x, z, scale, amplitude) {
+            // This is a very basic procedural noise. For proper Perlin noise, use a library.
+            const val1 = Math.sin(x * scale) * amplitude;
+            const val2 = Math.cos(z * scale) * amplitude;
+            const val3 = Math.sin((x + z) * scale * 0.7) * amplitude * 0.5;
+            return val1 + val2 + val3;
+        }
 
-      controls.moveRight(direction.x * currentSpeed);
-      controls.moveForward(direction.z * currentSpeed);
+        // Function to generate the random terrain
+        function generateTerrain(width, depth, heightScale) {
+            console.log("Generating terrain...");
+            for (let x = -width / 2; x < width / 2; x++) {
+                for (let z = -depth / 2; z < depth / 2; z++) {
+                    // Calculate height using a simple noise function
+                    const baseHeight = Math.floor(getNoiseHeight(x, z, 0.05, heightScale) + heightScale); // Ensures non-negative height
 
-      velocity.y -= 0.01; // gravity
-      controls.getObject().position.y += velocity.y;
-      if (controls.getObject().position.y < 2) {
-        velocity.y = 0;
-        controls.getObject().position.y = 2;
-        canJump = true;
-      }
+                    // Fill ground layers
+                    for (let y = 0; y < baseHeight; y++) {
+                        let blockType = 'dirt';
+                        if (y < baseHeight * 0.4 && Math.random() < 0.1) { // Deeper, small chance of stone/iron_ore
+                            blockType = Math.random() < 0.2 ? 'iron_ore' : 'stone';
+                        }
+                        addBlock(x, y, z, blockType);
+                    }
 
-      renderer.render(scene, camera);
-    }
+                    // Add grass layer on top of the highest block
+                    if (baseHeight >= 0) { // Ensure there's a block to put grass on
+                        addBlock(x, baseHeight, z, 'grass_top');
+                    }
 
-    animate();
-  </script>
+                    // Add some sand around "sea level" (adjust as needed)
+                    if (baseHeight < heightScale * 0.5 && baseHeight > heightScale * 0.2 && Math.random() < 0.5) {
+                         addBlock(x, baseHeight, z, 'sand'); // Replace grass or top dirt with sand
+                         // You might need to remove previous block if you're replacing.
+                         // For simplicity, this just adds on top or replaces the last added.
+                    }
+                }
+            }
+            console.log("Terrain generation complete.");
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update(); // Update controls in each frame
+            renderer.render(scene, camera);
+        }
+
+        // Initialize the scene when the script loads
+        init();
+
+        // main.js content ends here
+    </script>
 </body>
 </html>
