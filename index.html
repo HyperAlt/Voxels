@@ -12,8 +12,9 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.165.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
+
     <script>
-        // main.js content starts here (embedded)
+        // --- START OF YOUR GAME JAVASCRIPT CODE ---
 
         let scene, camera, renderer, controls;
         const world = {}; // To store our block data
@@ -21,20 +22,18 @@
 
         // Texture loader
         const textureLoader = new THREE.TextureLoader();
+        // *** IMPORTANT CHANGE HERE: REMOVED 'textures/' FROM PATHS ***
         const textures = {
-            grass_top: textureLoader.load('textures/grass_top.png'),
-            dirt: textureLoader.load('textures/dirt.png'),
-            stone: textureLoader.load('textures/stone.png'),
-            sand: textureLoader.load('textures/sand.png'),
-            iron_ore: textureLoader.load('textures/iron_ore.png'),
+            grass_top: textureLoader.load('grass_top.png'),
+            dirt: textureLoader.load('dirt.png'),
+            stone: textureLoader.load('stone.png'),
+            sand: textureLoader.load('sand.png'),
+            iron_ore: textureLoader.load('iron_ore.png'),
         };
 
         // Function to create a material for a block type
         function createBlockMaterial(textureName) {
-            // For this basic setup, we use the same texture for all faces.
-            // For grass, you'd typically have different textures for top, side, and bottom.
-            // A more advanced approach would use a texture atlas and UV mapping.
-            return new THREE.MeshLambertMaterial({ map: textures[textureName] }); // Using LambertMaterial for basic lighting
+            return new THREE.MeshLambertMaterial({ map: textures[textureName] });
         }
 
         function init() {
@@ -43,10 +42,11 @@
 
             // Skybox setup
             const skyboxLoader = new THREE.CubeTextureLoader();
+            // *** IMPORTANT CHANGE HERE: REMOVED 'textures/' FROM PATHS ***
             const skyboxTextures = [
-                'textures/px.png', 'textures/nx.png', // Right, Left
-                'textures/py.png', 'textures/ny.png', // Top, Bottom
-                'textures/pz.png', 'textures/nz.png'  // Front, Back
+                'px.png', 'nx.png', // Right, Left
+                'py.png', 'ny.png', // Top, Bottom
+                'pz.png', 'nz.png'  // Front, Back
             ];
             const skybox = skyboxLoader.load(skyboxTextures);
             scene.background = skybox;
@@ -58,7 +58,7 @@
             // Renderer setup
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+            document.body.appendChild(renderer.domElement); // Add the renderer's canvas to the document body
 
             // OrbitControls for camera movement
             controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -68,11 +68,11 @@
             controls.maxDistance = 500;
             controls.maxPolarAngle = Math.PI / 2; // Prevent camera from going below ground
 
-            // Basic lighting (essential for MeshLambertMaterial)
+            // Basic lighting (essential for MeshLambertMaterial to show anything)
             const ambientLight = new THREE.AmbientLight(0x404040); // Soft white light
             scene.add(ambientLight);
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
-            directionalLight.position.set(50, 100, 50);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7); // Light from a specific direction
+            directionalLight.position.set(50, 100, 50); // Position the light
             scene.add(directionalLight);
 
             // Handle window resizing
@@ -104,7 +104,6 @@
 
         // Simple Perlin-like noise function for height (for demonstration, not a true Perlin implementation)
         function getNoiseHeight(x, z, scale, amplitude) {
-            // This is a very basic procedural noise. For proper Perlin noise, use a library.
             const val1 = Math.sin(x * scale) * amplitude;
             const val2 = Math.cos(z * scale) * amplitude;
             const val3 = Math.sin((x + z) * scale * 0.7) * amplitude * 0.5;
@@ -116,28 +115,22 @@
             console.log("Generating terrain...");
             for (let x = -width / 2; x < width / 2; x++) {
                 for (let z = -depth / 2; z < depth / 2; z++) {
-                    // Calculate height using a simple noise function
-                    const baseHeight = Math.floor(getNoiseHeight(x, z, 0.05, heightScale) + heightScale); // Ensures non-negative height
+                    const baseHeight = Math.floor(getNoiseHeight(x, z, 0.05, heightScale) + heightScale);
 
-                    // Fill ground layers
                     for (let y = 0; y < baseHeight; y++) {
                         let blockType = 'dirt';
-                        if (y < baseHeight * 0.4 && Math.random() < 0.1) { // Deeper, small chance of stone/iron_ore
+                        if (y < baseHeight * 0.4 && Math.random() < 0.1) {
                             blockType = Math.random() < 0.2 ? 'iron_ore' : 'stone';
                         }
                         addBlock(x, y, z, blockType);
                     }
 
-                    // Add grass layer on top of the highest block
-                    if (baseHeight >= 0) { // Ensure there's a block to put grass on
+                    if (baseHeight >= 0) {
                         addBlock(x, baseHeight, z, 'grass_top');
                     }
 
-                    // Add some sand around "sea level" (adjust as needed)
                     if (baseHeight < heightScale * 0.5 && baseHeight > heightScale * 0.2 && Math.random() < 0.5) {
-                         addBlock(x, baseHeight, z, 'sand'); // Replace grass or top dirt with sand
-                         // You might need to remove previous block if you're replacing.
-                         // For simplicity, this just adds on top or replaces the last added.
+                         addBlock(x, baseHeight, z, 'sand');
                     }
                 }
             }
@@ -147,14 +140,14 @@
         // Animation loop
         function animate() {
             requestAnimationFrame(animate);
-            controls.update(); // Update controls in each frame
+            controls.update();
             renderer.render(scene, camera);
         }
 
         // Initialize the scene when the script loads
         init();
 
-        // main.js content ends here
+        // --- END OF YOUR GAME JAVASCRIPT CODE ---
     </script>
 </body>
 </html>
