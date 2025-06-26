@@ -4,146 +4,162 @@
   <meta charset="UTF-8" />
   <title>Voxel World</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #000; }
+    body { margin: 0; overflow: hidden; }
     canvas { display: block; }
-    #fps {
-      position: absolute;
-      top: 6px;
-      left: 6px;
-      background: #111;
-      color: lime;
-      font: 12px monospace;
-      padding: 3px 6px;
-      z-index: 10;
-    }
-    #joystickZone {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      width: 100px;
-      height: 100px;
-      z-index: 10;
-    }
+    #fps { position: fixed; top: 4px; left: 4px; background: rgba(0,0,0,0.6); color: lime; font-family: monospace; font-size: 14px; padding: 2px 6px; border-radius: 4px; z-index: 9; }
+    #ui { position: fixed; bottom: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 9; }
+    #ui button { background: green; color: white; border: none; padding: 8px 12px; border-radius: 5px; font-size: 14px; }
+    #joystick { position: fixed; bottom: 20px; left: 20px; width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 2px solid white; touch-action: none; }
+    #stick { width: 40px; height: 40px; background: white; border-radius: 50%; position: absolute; top: 20px; left: 20px; }
   </style>
 </head>
 <body>
   <div id="fps">FPS: 0</div>
-  <div id="joystickZone"></div>
+  <div id="ui">
+    <button id="jump">Jump</button>
+    <button id="sprint">Sprint</button>
+  </div>
+  <div id="joystick"><div id="stick"></div></div>
 
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
-    import { OrbitControls } from 'https://unpkg.com/three@0.152.2/examples/jsm/controls/OrbitControls.js';
-    import SimplexNoise from 'https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/+esm';
+    import { PointerLockControls } from 'https://unpkg.com/three@0.152.2/examples/jsm/controls/PointerLockControls.js';
+    import SimplexNoise from 'https://cdn.skypack.dev/simplex-noise';
 
-    // Load nipplejs joystick
-    const nippleScript = document.createElement('script');
-    nippleScript.src = 'https://cdn.jsdelivr.net/npm/nipplejs@0.9.0/dist/nipplejs.min.js';
-    document.body.appendChild(nippleScript);
+    const simplex = new SimplexNoise();
 
-    nippleScript.onload = () => {
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.1, 1000);
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(100, innerWidth/innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(innerWidth, innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-      // Skybox
-      const loader = new THREE.CubeTextureLoader();
-      scene.background = loader.load([
-        'px.jpg', 'nx.jpg',
-        'py.jpg', 'ny.jpg',
-        'pz.jpg', 'nz.jpg'
-      ]);
+    const controls = new PointerLockControls(camera, renderer.domElement);
+    scene.add(controls.getObject());
 
-      scene.add(new THREE.AmbientLight(0xffffff));
+    const textures = {};
+    const loader = new THREE.TextureLoader();
+    const textureList = ['grass_top', 'stone', 'dirt', 'sand', 'iron_ore'];
+    for (let name of textureList) {
+      textures[name] = loader.load(`${name}.png`);
+    }
 
-      // Load textures
-      const texLoader = new THREE.TextureLoader();
-      const textures = {
-        grass: texLoader.load('grass_top.png'),
-        dirt: texLoader.load('dirt.png'),
-        sand: texLoader.load('sand.png'),
-        stone: texLoader.load('stone.png'),
-        iron: texLoader.load('iron_ore.png')
-      };
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    const materials = {
+      grass: new THREE.MeshBasicMaterial({ map: textures.grass_top }),
+      stone: new THREE.MeshBasicMaterial({ map: textures.stone }),
+      dirt: new THREE.MeshBasicMaterial({ map: textures.dirt }),
+      sand: new THREE.MeshBasicMaterial({ map: textures.sand }),
+      iron: new THREE.MeshBasicMaterial({ map: textures.iron_ore }),
+    };
 
-      // Terrain
-      const simplex = new SimplexNoise();
-      const size = 32;
-      for (let x = -size; x < size; x++) {
-        for (let z = -size; z < size; z++) {
-          const y = Math.floor(simplex.noise2D(x / 10, z / 10) * 5);
-          const geo = new THREE.BoxGeometry(1, 1, 1);
+    function getMat(y) {
+      if (y < 1) return materials.stone;
+      if (y < 2) return materials.dirt;
+      if (y < 3) return materials.sand;
+      if (Math.random() > 0.995) return materials.iron;
+      return materials.grass;
+    }
 
-          let tex = textures.grass;
-          if (y < -2) tex = textures.sand;
-          else if (y > 3) tex = textures.stone;
-          else if (Math.random() < 0.03) tex = textures.iron;
-
-          const mat = new THREE.MeshBasicMaterial({ map: tex });
-          const cube = new THREE.Mesh(geo, mat);
+    // Generate terrain
+    for (let x = -16; x <= 16; x++) {
+      for (let z = -16; z <= 16; z++) {
+        const height = Math.floor(simplex.noise2D(x / 10, z / 10) * 4 + 4);
+        for (let y = 0; y < height; y++) {
+          const cube = new THREE.Mesh(boxGeo, getMat(y));
           cube.position.set(x, y, z);
           scene.add(cube);
         }
       }
+    }
 
-      camera.position.set(0, 10, 20);
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controls.enablePan = false;
+    camera.position.set(0, 10, 0);
 
-      // Movement
-      const velocity = new THREE.Vector3();
-      const joystickVector = { x: 0, y: 0 };
-      const keys = {};
-      window.onkeydown = e => keys[e.key.toLowerCase()] = true;
-      window.onkeyup = e => keys[e.key.toLowerCase()] = false;
+    // Movement
+    let velocity = new THREE.Vector3();
+    const keys = {};
+    document.addEventListener('keydown', e => keys[e.code] = true);
+    document.addEventListener('keyup', e => keys[e.code] = false);
 
-      const manager = nipplejs.create({
-        zone: document.getElementById('joystickZone'),
-        mode: 'static',
-        position: { left: '50px', bottom: '50px' },
-        color: 'lime'
-      });
+    let canJump = false;
+    const direction = new THREE.Vector3();
+    const speed = 0.1;
+    const sprintSpeed = 0.2;
 
-      manager.on('move', (evt, data) => {
-        if (data && data.vector) {
-          joystickVector.x = data.vector.x;
-          joystickVector.y = data.vector.y;
-        }
-      });
-      manager.on('end', () => {
-        joystickVector.x = 0;
-        joystickVector.y = 0;
-      });
+    // Jump and Sprint
+    document.getElementById('jump').onclick = () => {
+      if (canJump) {
+        velocity.y += 0.2;
+        canJump = false;
+      }
+    };
+    document.getElementById('sprint').onmousedown = () => keys['ShiftLeft'] = true;
+    document.getElementById('sprint').onmouseup = () => keys['ShiftLeft'] = false;
 
-      // FPS counter
-      const fpsEl = document.getElementById('fps');
-      let last = performance.now(), frames = 0;
+    // Joystick movement
+    const stick = document.getElementById('stick');
+    let joyX = 0, joyY = 0;
+    let dragging = false;
+    stick.addEventListener('pointerdown', e => dragging = true);
+    window.addEventListener('pointerup', e => { dragging = false; stick.style.left = '20px'; stick.style.top = '20px'; joyX = joyY = 0; });
+    window.addEventListener('pointermove', e => {
+      if (dragging) {
+        const rect = document.getElementById('joystick').getBoundingClientRect();
+        joyX = (e.clientX - rect.left - 40) / 40;
+        joyY = (e.clientY - rect.top - 40) / 40;
+        joyX = Math.max(-1, Math.min(1, joyX));
+        joyY = Math.max(-1, Math.min(1, joyY));
+        stick.style.left = `${joyX * 20 + 20}px`;
+        stick.style.top = `${joyY * 20 + 20}px`;
+      }
+    });
 
-      function animate() {
-        requestAnimationFrame(animate);
+    // Pointer lock to enable camera look
+    document.body.onclick = () => controls.lock();
 
-        const speed = 0.1;
-        velocity.x = (keys['a'] ? -1 : keys['d'] ? 1 : joystickVector.x || 0) * speed;
-        velocity.z = (keys['w'] ? -1 : keys['s'] ? 1 : joystickVector.y || 0) * speed;
+    // FPS counter
+    const fpsEl = document.getElementById('fps');
+    let lastTime = performance.now(), frames = 0;
 
-        camera.position.x += velocity.x;
-        camera.position.z += velocity.z;
+    function animate() {
+      requestAnimationFrame(animate);
 
-        controls.update();
-        renderer.render(scene, camera);
-
-        frames++;
-        const now = performance.now();
-        if (now - last > 1000) {
-          fpsEl.textContent = 'FPS: ' + frames;
-          frames = 0;
-          last = now;
-        }
+      // FPS
+      frames++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        fpsEl.innerText = 'FPS: ' + frames;
+        frames = 0;
+        lastTime = now;
       }
 
-      animate();
-    };
+      // Movement
+      direction.z = joyY;
+      direction.x = joyX;
+
+      if (keys['KeyW']) direction.z = -1;
+      if (keys['KeyS']) direction.z = 1;
+      if (keys['KeyA']) direction.x = -1;
+      if (keys['KeyD']) direction.x = 1;
+
+      direction.normalize();
+      const currentSpeed = keys['ShiftLeft'] ? sprintSpeed : speed;
+
+      controls.moveRight(direction.x * currentSpeed);
+      controls.moveForward(direction.z * currentSpeed);
+
+      velocity.y -= 0.01; // gravity
+      controls.getObject().position.y += velocity.y;
+      if (controls.getObject().position.y < 2) {
+        velocity.y = 0;
+        controls.getObject().position.y = 2;
+        canJump = true;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
   </script>
 </body>
 </html>
