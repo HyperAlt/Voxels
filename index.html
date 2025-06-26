@@ -38,7 +38,7 @@
   <script type="module">
     import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
     import { OrbitControls } from 'https://unpkg.com/three@0.152.2/examples/jsm/controls/OrbitControls.js';
-    import { SimplexNoise } from 'https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/+esm';
+    import SimplexNoise from 'https://cdn.jsdelivr.net/npm/simplex-noise@4.0.1/+esm';
 
     let scene = new THREE.Scene();
     let camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -48,35 +48,41 @@
 
     // Skybox
     const loader = new THREE.CubeTextureLoader();
-    scene.background = loader.load(['nx.jpg','px.jpg','ny.jpg','py.jpg','nz.jpg','pz.jpg']);
+    scene.background = loader.load([
+      'px.jpg', 'nx.jpg',
+      'py.jpg', 'ny.jpg',
+      'pz.jpg', 'nz.jpg'
+    ]);
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 1);
-    scene.add(ambient);
+    // Light
+    const light = new THREE.AmbientLight(0xffffff);
+    scene.add(light);
 
-    // Terrain generation
-    const simplex = new SimplexNoise();
-    const blockSize = 1;
-    const terrainSize = 50;
+    // Textures
+    const texLoader = new THREE.TextureLoader();
     const textures = {
-      grass: new THREE.TextureLoader().load('grass_top.png'),
-      dirt: new THREE.TextureLoader().load('dirt.png'),
-      sand: new THREE.TextureLoader().load('sand.png'),
-      stone: new THREE.TextureLoader().load('stone.png'),
-      iron: new THREE.TextureLoader().load('iron_ore.png')
+      grass: texLoader.load('grass_top.png'),
+      dirt: texLoader.load('dirt.png'),
+      sand: texLoader.load('sand.png'),
+      stone: texLoader.load('stone.png'),
+      iron: texLoader.load('iron_ore.png')
     };
-    for (let x = -terrainSize; x < terrainSize; x++) {
-      for (let z = -terrainSize; z < terrainSize; z++) {
-        const y = Math.floor(simplex.noise2D(x / 10, z / 10) * 5);
-        const geometry = new THREE.BoxGeometry(blockSize, blockSize, blockSize);
+
+    // Terrain
+    const simplex = new SimplexNoise();
+    const size = 40;
+    for (let x = -size; x < size; x++) {
+      for (let z = -size; z < size; z++) {
+        const y = Math.floor(simplex.noise2D(x / 15, z / 15) * 5);
+        const geo = new THREE.BoxGeometry(1, 1, 1);
 
         let tex = textures.grass;
-        if (y < -2) tex = textures.sand;
-        else if (y > 3) tex = textures.stone;
-        else if (Math.random() < 0.05) tex = textures.iron;
+        if (y <= -2) tex = textures.sand;
+        else if (y >= 3) tex = textures.stone;
+        else if (Math.random() < 0.03) tex = textures.iron;
 
-        const material = new THREE.MeshBasicMaterial({ map: tex });
-        const cube = new THREE.Mesh(geometry, material);
+        const mat = new THREE.MeshBasicMaterial({ map: tex });
+        const cube = new THREE.Mesh(geo, mat);
         cube.position.set(x, y, z);
         scene.add(cube);
       }
@@ -93,7 +99,7 @@
 
     document.getElementById('jumpBtn').onclick = () => {
       if (!isJumping) {
-        velocity.y = 0.3;
+        velocity.y = 0.25;
         isJumping = true;
       }
     };
@@ -104,11 +110,10 @@
     window.onkeydown = e => keys[e.key.toLowerCase()] = true;
     window.onkeyup = e => keys[e.key.toLowerCase()] = false;
 
-    // FPS Counter
-    let fpsCounter = document.getElementById('fps');
-    let lastTime = performance.now(), frames = 0;
+    // FPS
+    let fpsDisplay = document.getElementById('fps');
+    let lastTime = performance.now(), frameCount = 0;
 
-    // Animate
     function animate() {
       requestAnimationFrame(animate);
       let speed = isSprinting ? 0.2 : 0.1;
@@ -118,12 +123,8 @@
       if (keys['a']) velocity.x = -speed;
       if (keys['d']) velocity.x = speed;
 
-      camera.position.x += velocity.x;
-      camera.position.y += velocity.y;
-      camera.position.z += velocity.z;
-
-      velocity.x *= 0.9;
-      velocity.z *= 0.9;
+      camera.position.add(velocity);
+      velocity.multiplyScalar(0.9);
       velocity.y -= 0.01;
 
       if (camera.position.y <= 3) {
@@ -135,15 +136,15 @@
       controls.update();
       renderer.render(scene, camera);
 
-      // FPS
-      frames++;
-      let now = performance.now();
-      if (now - lastTime > 1000) {
-        fpsCounter.textContent = 'FPS: ' + frames;
-        frames = 0;
+      frameCount++;
+      const now = performance.now();
+      if (now - lastTime >= 1000) {
+        fpsDisplay.textContent = 'FPS: ' + frameCount;
+        frameCount = 0;
         lastTime = now;
       }
     }
+
     animate();
   </script>
 </body>
