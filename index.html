@@ -8,13 +8,23 @@
         body { margin: 0; overflow: hidden; }
         canvas { display: block; }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.165.0/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.165.0/examples/js/controls/OrbitControls.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.165.0/three.module.min.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+            }
+        }
+    </script>
 </head>
 <body>
 
-    <script>
+    <script type="module">
         // --- START OF YOUR GAME JAVASCRIPT CODE ---
+
+        // IMPORTANT: Now we explicitly import THREE and OrbitControls
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; // Notice 'addons/' and '.js'
 
         let scene, camera, renderer, controls;
         const world = {}; // To store our block data
@@ -23,6 +33,7 @@
         // Texture loader
         const textureLoader = new THREE.TextureLoader();
         // *** IMPORTANT CHANGE HERE: REMOVED 'textures/' FROM PATHS ***
+        // *** ALSO ENSURE YOUR TEXTURE FILES ARE IN THE SAME DIRECTORY AS YOUR HTML ***
         const textures = {
             grass_top: textureLoader.load('grass_top.png'),
             dirt: textureLoader.load('dirt.png'),
@@ -43,6 +54,7 @@
             // Skybox setup
             const skyboxLoader = new THREE.CubeTextureLoader();
             // *** IMPORTANT CHANGE HERE: REMOVED 'textures/' FROM PATHS ***
+            // *** ALSO ENSURE YOUR SKYBOX IMAGE FILES ARE IN THE SAME DIRECTORY AS YOUR HTML ***
             const skyboxTextures = [
                 'px.png', 'nx.png', // Right, Left
                 'py.png', 'ny.png', // Top, Bottom
@@ -61,7 +73,7 @@
             document.body.appendChild(renderer.domElement); // Add the renderer's canvas to the document body
 
             // OrbitControls for camera movement
-            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls = new OrbitControls(camera, renderer.domElement); // Now OrbitControls is directly available
             controls.enableDamping = true; // For smoother movement
             controls.dampingFactor = 0.05;
             controls.minDistance = 1;
